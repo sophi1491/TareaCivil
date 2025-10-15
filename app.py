@@ -180,28 +180,63 @@ col1, col2 = st.columns([1, 1])
 
 with col1:
     st.subheader("Diagrama de cargas")
+
     fig, ax = plt.subplots()
-    ax.plot(x, w_x/1000.0, linewidth=2)  # N/m -> kN/m
-    # Flechas para cargas puntuales según el caso
-    if case.startswith("1)"):
-        ax.annotate("", xy=(a, max(0, np.max(w_x)/1000.0)+0.05),
-                    xytext=(a, -max(0.2, np.max(w_x)/1000.0)+0.05),
-                    arrowprops=dict(arrowstyle="->", lw=2))
-        ax.text(a, 0.02, f"P={P:.2f} kN", ha="center", va="bottom", rotation=90)
-    if case.startswith("3)"):
-        ax.annotate("", xy=(L, 0.2), xytext=(L, -0.8), arrowprops=dict(arrowstyle="->", lw=2))
-        ax.text(L, 0.22, f"P={P:.2f} kN", ha="center")
-    if case.startswith("5)"):
-        ax.annotate("", xy=(a, 0.2), xytext=(a, -0.8), arrowprops=dict(arrowstyle="->", lw=2))
-        ax.text(a, 0.22, f"P={P:.2f} kN", ha="center")
-    if case.startswith("6)"):
-        for (aa, PP) in [(a1, P1), (a2, P2)]:
-            ax.annotate("", xy=(aa, 0.2), xytext=(aa, -0.8), arrowprops=dict(arrowstyle="->", lw=2))
-            ax.text(aa, 0.22, f"{PP:.1f} kN", ha="center")
+
+    # w(x) en kN/m para graficar
+    w_kNm = w_x / 1000.0
+    ax.plot(x, w_kNm, linewidth=2)
+
+    # --- utilitario para dibujar cargas puntuales sin que "se salgan" ---
+    def draw_point_load(xpos, PkN, arrow_h=0.8):
+        """
+        Dibuja una flecha vertical de carga puntual en (xpos),
+        con altura controlada arrow_h (en unidades del eje y = kN/m).
+        PkN > 0 se dibuja hacia abajo (convención usual).
+        """
+        sgn = -1  # hacia abajo
+        ax.annotate(
+            "",
+            xy=(xpos, 0.0),
+            xytext=(xpos, sgn * arrow_h),
+            arrowprops=dict(arrowstyle="-|>", lw=2, color="black"),
+        )
+        ax.text(
+            xpos,
+            sgn * arrow_h - 0.1 if sgn < 0 else sgn * arrow_h + 0.1,
+            f"{PkN:.2f} kN",
+            ha="center",
+            va="top" if sgn < 0 else "bottom",
+            fontsize=9,
+        )
+
+    # --- dibuja las cargas según el caso seleccionado ---
+    if case.startswith("1)"):                 # simplemente apoyada + carga puntual en a
+        draw_point_load(a, P)
+    elif case.startswith("3)"):               # voladizo + carga puntual en extremo
+        draw_point_load(L, P)
+    elif case.startswith("5)"):               # voladizo + carga puntual a distancia a
+        draw_point_load(a, P)
+    elif case.startswith("6)"):               # simplemente apoyada + dos puntuales
+        draw_point_load(a1, P1)
+        draw_point_load(a2, P2)
+    # para w uniforme (casos 2 y 4) basta la línea de w(x)
+
+    # --- límites del eje y para que siempre quepan las flechas ---
+    y_min_data = float(np.min(w_kNm)) if w_kNm.size else 0.0
+    y_max_data = float(np.max(w_kNm)) if w_kNm.size else 0.0
+    base_min = -1.1   # suficiente para ver la flecha (kN/m)
+    base_max =  0.4
+    y_min = min(y_min_data, base_min)
+    y_max = max(y_max_data, base_max)
+    if abs(y_max - y_min) < 1e-6:
+        y_max = y_min + 1.0
+    ax.set_ylim(y_min, y_max)
 
     ax.set_xlabel("x [m]")
     ax.set_ylabel("w(x) [kN/m]")
     ax.grid(True, alpha=0.3)
+    ax.margins(x=0.02)
     st.pyplot(fig)
 
     st.subheader("Reacciones")
